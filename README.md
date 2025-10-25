@@ -30,17 +30,71 @@ Kafka 集群压力测试项目
 
 ## 快速开始
 
-### 启动集群
+### 查看所有命令
 
 ```bash
-# 启动集群
-docker-compose up -d
+make help
+```
 
-# 查看状态
-docker-compose ps
+### Docker 集群管理
+
+```bash
+# 启动 Kafka 集群
+make up
+
+# 查看集群状态
+make status
+
+# 查看日志
+make logs
 
 # 停止集群
-docker-compose down
+make down
+
+# 停止并删除数据
+make down-clean
+
+# 重启集群
+make restart
+```
+
+### 压力测试
+
+#### 完整工作流程（推荐）
+
+```bash
+# 一键完成：启动集群 -> 创建 topic -> 快速测试
+make all
+```
+
+#### 分步执行
+
+```bash
+# 1. 启动集群
+make up
+
+# 2. 创建测试 topic
+make create-topic
+
+# 3. 快速测试（1 万条）
+make quick-test
+
+# 4. 完整测试（10 亿条，约 1.5 小时）
+make run
+
+# 5. 查看 topic 信息
+make describe-topic
+
+# 6. 消费消息验证
+make consume
+
+# ⚠️  注意：完整测试配置
+# - 消息总数：10 亿条
+# - 并发数：5000 个 goroutine
+# - 每个 goroutine：20 万条消息
+# - 预计存储空间需求：约 417 GB（含 3 个副本）
+# - 预计发送时间：约 80-90 分钟
+# - 预计吞吐量：约 20 万 msg/s
 ```
 
 ## 常用操作

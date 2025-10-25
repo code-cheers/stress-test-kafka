@@ -9,25 +9,44 @@ import (
 	"github.com/IBM/sarama"
 )
 
+// 格式化带宽显示
+func formatBandwidth(bytesPerSecond float64) string {
+	const (
+		KB = 1024
+		MB = KB * 1024
+		GB = MB * 1024
+	)
+
+	if bytesPerSecond >= GB {
+		return fmt.Sprintf("%.2f GB/s", bytesPerSecond/GB)
+	} else if bytesPerSecond >= MB {
+		return fmt.Sprintf("%.2f MB/s", bytesPerSecond/MB)
+	} else if bytesPerSecond >= KB {
+		return fmt.Sprintf("%.2f KB/s", bytesPerSecond/KB)
+	}
+	return fmt.Sprintf("%.0f B/s", bytesPerSecond)
+}
+
 const (
 	// Kafka broker 地址
 	broker = "localhost:19092"
 	topic  = "stress-test-topic"
 
-	// 测试参数 - 1 亿条消息
-	numGoroutines = 100   // 并发 goroutine 数量（增加并发）
-	msgsPerWorker = 1_000_000 // 每个 goroutine 发送 100 万条消息
+	// 测试参数 - 1 亿条消息（3 分钟完成）
+	numGoroutines = 1000   // 并发 goroutine 数量（高并发）
+	msgsPerWorker = 100_0000 // 每个 goroutine 发送 10 万条消息
 	totalMessages = numGoroutines * msgsPerWorker // 1 亿条消息
 )
 
 func main() {
-	fmt.Println("🚀 Kafka 100 Million Messages Stress Test Started")
+	fmt.Println("🚀 Kafka 100 Million Messages Stress Test (3min Target)")
 	fmt.Printf("Configuration:\n")
 	fmt.Printf("  - Broker: %s\n", broker)
 	fmt.Printf("  - Topic: %s\n", topic)
 	fmt.Printf("  - Goroutines: %d\n", numGoroutines)
 	fmt.Printf("  - Messages per goroutine: %d\n", msgsPerWorker)
 	fmt.Printf("  - Total messages: %d (%.2f million)\n", totalMessages, float64(totalMessages)/1e6)
+	fmt.Printf("  - Target: Complete in 3 minutes\n")
 	fmt.Println()
 
 	// 配置 Kafka producer - 使用异步 producer 提高性能
@@ -38,10 +57,10 @@ func main() {
 	config.Producer.RequiredAcks = 1 // 使用 1 提高吞吐量（leader 确认即可）
 	config.Producer.Compression = sarama.CompressionSnappy
 	
-	// 批量发送配置
-	config.Producer.Flush.Messages = 1000      // 每批 1000 条
+	// 批量发送配置 - 超高吞吐量优化
+	config.Producer.Flush.Messages = 10000      // 每批 10000 条（最大批处理）
 	config.Producer.Flush.Frequency = 100 * time.Millisecond // 每 100ms 刷新一次
-	config.Producer.MaxMessageBytes = 1000000  // 1MB
+	config.Producer.MaxMessageBytes = 10000000  // 10MB（增大缓冲区）
 
 	// 创建 producer
 	producer, err := sarama.NewAsyncProducer([]string{broker}, config)
@@ -55,6 +74,7 @@ func main() {
 	
 	var successCount int64
 	var errorCount int64
+	var totalBytesSent int64 // 总发送字节数
 	startTime := time.Now()
 	lastReportTime := startTime
 
@@ -90,17 +110,25 @@ func main() {
 				// 异步发送消息
 				producer.Input() <- msg
 				atomic.AddInt64(&successCount, 1)
+				// 统计发送的字节数（估算）
+				estimatedBytes := int64(len(message) + len(msg.Key.(sarama.StringEncoder)) + 50) // 包括key、headers等
+				atomic.AddInt64(&totalBytesSent, estimatedBytes)
 
-				// 每 50 万条消息报告一次进度
+				// 每 100 万条消息报告一次进度
 				total := atomic.LoadInt64(&successCount) + atomic.LoadInt64(&errorCount)
-				if total%500_000 == 0 {
+				if total%1_000_000 == 0 {
 					now := time.Now()
 					elapsed := now.Sub(startTime)
 					duration := now.Sub(lastReportTime)
-					rate := float64(500_000) / duration.Seconds()
+					rate := float64(1_000_000) / duration.Seconds()
+					totalBytes := atomic.LoadInt64(&totalBytesSent)
+					bandwidth := float64(totalBytes) / elapsed.Seconds()
 					
-					fmt.Printf("📊 Progress: %d/%d messages (%.2f%%) | Rate: %.0f msg/s | Elapsed: %v\n",
-						total, totalMessages, float64(total)/float64(totalMessages)*100, rate, elapsed)
+					// 格式化为合适的单位
+					bandwidthStr := formatBandwidth(bandwidth)
+					
+					fmt.Printf("📊 Progress: %d/%d (%.2f%%) | Rate: %.0f msg/s | Bandwidth: %s | Elapsed: %v\n",
+						total, totalMessages, float64(total)/float64(totalMessages)*100, rate, bandwidthStr, elapsed)
 					lastReportTime = now
 				}
 			}
@@ -128,6 +156,13 @@ func main() {
 	fmt.Printf("Duration: %v\n", duration)
 	fmt.Printf("Throughput: %.0f messages/second\n", 
 		float64(atomic.LoadInt64(&successCount))/duration.Seconds())
+	
+	// 带宽统计
+	totalBytes := atomic.LoadInt64(&totalBytesSent)
+	averageBandwidth := float64(totalBytes) / duration.Seconds()
+	fmt.Printf("Average bandwidth: %s\n", formatBandwidth(averageBandwidth))
+	fmt.Printf("Total data sent: %.2f MB\n", float64(totalBytes)/1024/1024)
+	
 	fmt.Printf("Average latency: %.2f ms/message\n",
 		duration.Seconds()*1000/float64(atomic.LoadInt64(&successCount)))
 	fmt.Println("============================================================")
