@@ -1,0 +1,107 @@
+version: '3.8'
+
+services:
+  kafka-controller-1:
+    image: apache/kafka:latest
+    container_name: kafka-controller-1
+    ports:
+      - "19092:19092"
+      - "19093:19093"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: controller,broker
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-controller-1:29093,2@kafka-controller-2:29093,3@kafka-controller-3:29093
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:29093,EXTERNAL://:19092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-controller-1:9092,EXTERNAL://localhost:19092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_MIN_INSYNC_REPLICAS: 2
+      KAFKA_CLUSTER_ID: M8dH9ZLUTLi8K3bH5kPnYg
+    volumes:
+      - kafka-controller-1-data:/var/lib/kafka/data
+    networks:
+      - kafka-network
+
+  kafka-controller-2:
+    image: apache/kafka:latest
+    container_name: kafka-controller-2
+    ports:
+      - "19094:19094"
+      - "19095:19095"
+    environment:
+      KAFKA_NODE_ID: 2
+      KAFKA_PROCESS_ROLES: controller,broker
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-controller-1:29093,2@kafka-controller-2:29093,3@kafka-controller-3:29093
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:29093,EXTERNAL://:19094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-controller-2:9092,EXTERNAL://localhost:19094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_MIN_INSYNC_REPLICAS: 2
+      KAFKA_CLUSTER_ID: M8dH9ZLUTLi8K3bH5kPnYg
+    volumes:
+      - kafka-controller-2-data:/var/lib/kafka/data
+    networks:
+      - kafka-network
+
+  kafka-controller-3:
+    image: apache/kafka:latest
+    container_name: kafka-controller-3
+    ports:
+      - "19096:19096"
+      - "19097:19097"
+    environment:
+      KAFKA_NODE_ID: 3
+      KAFKA_PROCESS_ROLES: controller,broker
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-controller-1:29093,2@kafka-controller-2:29093,3@kafka-controller-3:29093
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:29093,EXTERNAL://:19096
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-controller-3:9092,EXTERNAL://localhost:19096
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_MIN_INSYNC_REPLICAS: 2
+      KAFKA_CLUSTER_ID: M8dH9ZLUTLi8K3bH5kPnYg
+    volumes:
+      - kafka-controller-3-data:/var/lib/kafka/data
+    networks:
+      - kafka-network
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui-kraft
+    depends_on:
+      - kafka-controller-1
+      - kafka-controller-2
+      - kafka-controller-3
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: kafka-kraft-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-controller-1:9092,kafka-controller-2:9092,kafka-controller-3:9092
+    networks:
+      - kafka-network
+
+networks:
+  kafka-network:
+    driver: bridge
+
+volumes:
+  kafka-controller-1-data:
+  kafka-controller-2-data:
+  kafka-controller-3-data:
