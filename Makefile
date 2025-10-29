@@ -26,6 +26,10 @@ help:
 	@echo "  make test-full    - 运行完整压力测试"
 	@echo "  make all          - 完整工作流程"
 	@echo ""
+	@echo "💾 磁盘性能测试:"
+	@echo "  make disk-test    - 磁盘性能测试 (顺序+随机写入+对比分析)"
+	@echo "  make disk-clean   - 清理磁盘测试文件"
+	@echo ""
 	@echo "📦 其他命令:"
 	@echo "  make deps         - 安装 Go 依赖"
 	@echo "  make clean        - 清理编译产物"
@@ -158,6 +162,7 @@ clean-all: down-clean
 	go clean
 	@echo "✅ All cleaned!"
 
+
 # ==================== 完整测试流程 ====================
 
 # 快速测试流程
@@ -173,3 +178,54 @@ all: up create-topic quick-test
 	@echo ""
 	@echo "✅ Complete workflow done!"
 	@echo "📊 Kafka UI: http://localhost:8080"
+
+
+
+# ==================== 磁盘性能测试 ====================
+
+# 磁盘性能测试 (顺序+随机写入)
+disk-test:
+	@echo "💾 Starting disk performance test..."
+	@echo "⚠️  Note: This test requires fio to be installed"
+	@echo "   macOS: brew install fio"
+	@echo "   Ubuntu: apt-get install fio"
+	@echo "   CentOS: yum install fio"
+	@echo ""
+	@which fio > /dev/null || (echo "❌ fio not found, please install fio first" && exit 1)
+	@echo "📈 Running sequential write test (4KB blocks)..."
+	fio --name=seq-4k --size=1G --bs=4k --rw=write --direct=1 --numjobs=1 --runtime=30 --time_based --output=fio-seq-4k.txt
+	@echo "📊 Running random write test (4KB blocks)..."
+	fio --name=rand-4k --size=1G --bs=4k --rw=randwrite --direct=1 --numjobs=1 --runtime=30 --output=fio-rand-4k.txt
+	@echo "✅ Disk performance test completed!"
+	@echo "📄 Results saved to: fio-seq-4k.txt and fio-rand-4k.txt"
+	@echo ""
+	@echo "📊 测试结果对比分析:"
+	@echo "================================================"
+	@echo ""
+	@echo "🔍 测试参数: 1GB数据, 4KB块大小, 单线程, 30秒"
+	@echo ""
+	@echo "📈 顺序写入测试结果:"
+	@if [ -f fio-seq-4k.txt ]; then \
+		echo "  📈 带宽: $$(grep 'WRITE:' fio-seq-4k.txt | awk '{print $$3}' | head -1)"; \
+		echo "  🚀 IOPS: $$(grep 'IOPS=' fio-seq-4k.txt | awk -F'IOPS=' '{print $$2}' | awk '{print $$1}' | head -1)"; \
+		echo "  ⏰ 平均延迟: $$(grep 'clat.*avg=' fio-seq-4k.txt | awk -F'avg=' '{print $$2}' | awk '{print $$1}' | head -1) μs"; \
+	else \
+		echo "  ❌ 测试文件不存在"; \
+	fi
+	@echo ""
+	@echo "📊 随机写入测试结果:"
+	@if [ -f fio-rand-4k.txt ]; then \
+		echo "  📈 带宽: $$(grep 'WRITE:' fio-rand-4k.txt | awk '{print $$3}' | head -1)"; \
+		echo "  🚀 IOPS: $$(grep 'IOPS=' fio-rand-4k.txt | awk -F'IOPS=' '{print $$2}' | awk '{print $$1}' | head -1)"; \
+		echo "  ⏰ 平均延迟: $$(grep 'clat.*avg=' fio-rand-4k.txt | awk -F'avg=' '{print $$2}' | awk '{print $$1}' | head -1) μs"; \
+	else \
+		echo "  ❌ 测试文件不存在"; \
+	fi
+	@echo ""
+
+
+# 清理磁盘测试文件
+disk-clean:
+	@echo "🧹 Cleaning up disk test files..."
+	@rm -f write-test.* random-write.* fio*.txt seq*.* rand*.*
+	@echo "✅ Disk test files cleaned!"

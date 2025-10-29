@@ -226,10 +226,79 @@ make run
 - ✅ 详细的性能统计
 - ✅ 消息包含 key、value 和 headers
 
-## 性能测试建议
+## 磁盘性能测试
 
-本集群使用 KRaft 模式，具备以下优势：
-- 更低的延迟和更高的吞吐量
-- 更好的扩展性（支持百万级分区）
-- 无需维护 Zookeeper，部署运维更简单
-- 适合高并发和大规模压力测试场景
+本项目包含磁盘性能测试功能，使用 fio 测试磁盘的顺序写入和随机写入性能。
+
+### 安装 fio
+
+**macOS:**
+```bash
+brew install fio
+```
+
+**Ubuntu/Debian:**
+```bash
+apt-get install fio
+```
+
+**CentOS/RHEL:**
+```bash
+yum install fio
+```
+
+### 运行磁盘测试
+
+```bash
+# 完整磁盘性能测试（顺序+随机写入）
+make disk-test
+
+# 对比分析测试结果
+make disk-compare
+```
+
+### 测试配置
+
+**顺序写入测试:**
+- 数据大小: 1GB
+- 块大小: 1MB
+- 测试时长: 30秒
+- 并发数: 1个线程
+
+**随机写入测试:**
+- 数据大小: 1GB
+- 块大小: 4KB
+- 测试时长: 30秒
+- 并发数: 4个线程
+
+### 测试结果
+
+测试结果会保存到以下文件：
+- `fio-write.txt` - 顺序写入测试结果
+- `fio-randwrite.txt` - 随机写入测试结果
+
+**实际测试结果对比：**
+
+| 指标 | 顺序写入 | 随机写入 | 对比 |
+|------|----------|----------|------|
+| 带宽 | 3234 MiB/s | 68.0 MiB/s | 47.5倍 |
+| IOPS | 3234 | ~4350 | 1.3倍 |
+| 延迟 | 294.72 μs | ~230 μs | 1.2倍 |
+| 块大小 | 1MB | 4KB | - |
+| 并发数 | 1 | 4 | - |
+
+**分析结论：**
+- ✅ **顺序写入**: 高带宽，适合大文件传输和流式处理
+- ✅ **随机写入**: 高IOPS，适合数据库等随机访问场景
+- 📝 这是典型的磁盘特性：顺序访问性能远高于随机访问
+
+### 手动执行 fio 命令
+
+```bash
+# 顺序写入测试
+fio --name=write-test --size=1G --bs=1M --rw=write --direct=1 --numjobs=1 --runtime=30 --time_based --output=fio-write.txt
+
+# 随机写入测试
+fio --name=random-write --size=1G --bs=4k --rw=randwrite --direct=1 --numjobs=4 --runtime=30 --output=fio-randwrite.txt
+```
+
